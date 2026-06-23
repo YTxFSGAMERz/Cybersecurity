@@ -37,7 +37,7 @@ whoami     # Print current user    → student
 
 ### Output Screenshot
 
-![Basic Linux Commands Output](./Basic-Linux-Commands/screenshot.png)
+![Basic Linux Commands Output](./screenshot.png)
 
 ---
 
