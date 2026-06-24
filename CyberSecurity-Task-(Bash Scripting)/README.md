@@ -14,7 +14,7 @@ CyberSecurity-Task-(Bash Scripting)/
 ├── 4. Bash Scripting.docx.md
 ├── screenshot.png
 ├── screenshot_1.png
-├── screenshot_2.png
+├── screenshot_3.png
 └── README.md
 ```
 
@@ -22,7 +22,7 @@ CyberSecurity-Task-(Bash Scripting)/
 
 ## 🎯 Objective
 
-Write a Bash script to read the contents of a protected file (`secret.txt`) using `read_secret.sh` and print the output on screen.
+Write a Bash script to read the contents of a protected file (`secret.txt`) using `read_secret.sh`, store the content in a variable, and print it on screen.
 
 ---
 
@@ -77,8 +77,9 @@ echo "The secret is: $secret"
 ```bash
 nano read_secret.sh         # Write the bash script
 cat read_secret.sh          # Verify script content
-chmod +x read_secret.sh     # Attempt execute permission (not permitted)
-./run_secret secret.txt     # Execute via run_secret → flag captured
+chmod +x read_secret.sh     # Attempt execute permission → FAILED (not permitted)
+./read_secret.sh            # Direct run → error handling fires: Permission denied
+./run_secret secret.txt     # Execute via SUID wrapper → flag captured
 ```
 
 ---
@@ -86,36 +87,60 @@ chmod +x read_secret.sh     # Attempt execute permission (not permitted)
 ## 🔍 Security Analysis: Permissions & Privilege Escalation
 
 ### Why did `chmod +x` fail?
-When trying to make the script executable (`chmod +x read_secret.sh`), it failed with a permission error. This typically happens for a few reasons in a locked-down CTF environment:
-1. **Ownership Restrictions:** You can only change the permissions of a file if you are the owner or the root user. If the file was created in a restricted directory with enforced group ownership or a restrictive `umask`, you might not have the right to modify its execution bits.
-2. **Mount Restrictions (`noexec`):** The filesystem or directory (like `/tmp`) might be mounted with the `noexec` flag, which prevents any file from being made executable or run directly.
-3. **AppArmor / SELinux:** Advanced security modules might be configured to prevent standard users from executing arbitrary scripts.
+
+When trying `chmod +x read_secret.sh`, it failed with:
+```
+chmod: changing permissions of 'read_secret.sh': Operation not permitted
+```
+
+Reasons this happens in a locked-down environment:
+
+1. **Ownership Restrictions:** You can only change permissions on files you own. If the file belongs to another user or root, the OS blocks the chmod call.
+2. **noexec Mount Flag:** The filesystem or directory may be mounted with the `noexec` flag, preventing any file from being executed directly.
+3. **AppArmor / SELinux:** Security modules may be configured to block standard users from making scripts executable.
+
+---
 
 ### How did `run_secret` bypass permissions?
-The file `secret.txt` is a **protected file**, meaning its read permissions are likely restricted to `root` or a specific admin user (e.g., `chmod 600 secret.txt`). A standard user cannot `cat` it directly. 
 
-The `run_secret` executable bypassed this restriction because it is likely a **SUID (Set Owner User ID)** binary or runs via specific `sudo` rules. 
-* When a binary has the SUID bit set (`chmod u+s`), it executes with the privileges of the file's owner (usually `root`), regardless of who runs it.
-* Therefore, when we executed `./run_secret secret.txt`, the program temporarily assumed elevated privileges, successfully read the protected file, and returned the output to us.
+From `ls -la`, two key things are visible:
 
-### Alternative Escalation Methods
-In a real-world scenario, if you encounter a protected file you need to read but lack a convenient SUID wrapper like `run_secret`, you would look for other **Privilege Escalation** vectors:
-* **Misconfigured `sudo` rights:** Checking `sudo -l` to see if you can run commands like `cat`, `less`, `vim`, or `awk` as root without a password.
-* **Exploiting other SUID binaries:** Finding other common binaries with the SUID bit set (`find / -perm -4000 2>/dev/null`) and using them to read files (e.g., `base64`, `tar`, `cp`).
-* **Cron Jobs:** Finding a script that runs automatically as root, which is writable by your user, and injecting a `cat secret.txt > /tmp/flag` command into it.
+```
+-rw-r-----  1 root    perm    26 Feb 19 16:47 secret.txt
+-rwsr-xr-x  1 root    root 16008 Apr 13 09:39 run_secret
+```
+
+- `secret.txt` → `-rw-r-----  root  perm` — only root and the `perm` group can read it. The `student` user has **no read access**, which is exactly why `./read_secret.sh` triggered the error handler with `Permission denied`.
+
+- `run_secret` → `-rwsr-xr-x  root  root` — notice the **`s` in place of `x`** in the owner's execute bit. This is the **SUID (Set Owner User ID) bit** confirmed live:
+  - When SUID is set, the binary executes with the privileges of its **owner (root)**, regardless of who runs it.
+  - So `./run_secret secret.txt` temporarily assumed root-level privileges, read the protected file, and returned the flag.
+  - The `s` in `-rw**s**r-xr-x` is the smoking gun! 🔫
+
+---
+
+### Alternative Methods to Read Protected Files
+
+In a real-world scenario, if no SUID wrapper exists:
+
+| Method | Command | Description |
+|--------|---------|-------------|
+| Sudo misconfiguration | `sudo -l` | Check if you can run `cat`, `less`, or `awk` as root without password |
+| Other SUID binaries | `find / -perm -4000 2>/dev/null` | Find binaries with SUID set — `base64`, `tar`, `cp` can be abused |
+| Cron job injection | `echo "cat secret.txt > /tmp/flag" >> root_cron.sh` | Inject into a writable root-owned cron script |
 
 ---
 
 ## 📸 Screenshots
 
-**Screenshot 1** — Full terminal workflow  
+**Screenshot 1** — Full terminal workflow
 ![Full Terminal Output](./screenshot.png)
 
-**Screenshot 2** — Flag output  
+**Screenshot 2** — Flag output
 ![Flag Output](./screenshot_1.png)
 
-**Screenshot 3** — Script content  
-![Script Content](./screenshot_2.png)
+**Screenshot 3** — Security analysis evidence (`ls -la` proving SUID bit + error handling firing)
+![Security Analysis Evidence](./screenshot_3.png)
 
 ---
 
