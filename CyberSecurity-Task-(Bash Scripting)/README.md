@@ -137,6 +137,7 @@ In a real-world scenario, if no SUID wrapper exists:
 ![Full Terminal Output](./screenshot.png)
 
 **Screenshot 2** — Flag output
+
 ![Flag Output](./screenshot_1.png)
 
 **Screenshot 3** — Security analysis evidence (`ls -la` proving SUID bit + error handling firing)
