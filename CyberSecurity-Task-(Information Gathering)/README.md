@@ -9,9 +9,16 @@
 ```
 CyberSecurity-Task-InfoGathering-FarhanShaikh/
 ├── 5. Information Gathering.docx.md
+├── screenshot.png
 ├── README.md
 └── Information Gathering.docx
 ```
+
+---
+
+## 📸 TryHackMe — Answered Questions
+
+![TryHackMe Screenshot](screenshot.png)
 
 ---
 
